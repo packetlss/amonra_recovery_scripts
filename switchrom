@@ -1,0 +1,410 @@
+#!/sbin/sh
+VER="1.1"
+MYFOLDER="switchROM"
+SDCARD="/sdcard"
+EXTPART="/system/sd"
+NANDSH="nandroid-mobile.sh"
+NANDLOG="nandroid.log"
+alias _GREP_="busybox grep"
+alias _AWK_="busybox awk"
+alias _MOUNT_="busybox mount"
+alias _UMOUNT_="busybox umount"
+alias _LS_="busybox ls"
+alias _TAR_="busybox tar"
+alias _CP_="busybox cp"
+alias _RM_="busybox rm"
+alias _MKDIR_="busybox mkdir"
+
+# global variable
+romname=
+
+do_exit()
+{
+	code=$1
+	_UMOUNT_ ${EXTPART} > /dev/null 2>&1
+	_UMOUNT_ ${SDCARD} > /dev/null 2>&1
+	exit $code
+}
+
+print_usage()
+{
+	echo ""
+	echo "Usage: $0 OPTIONS <rom_name>"
+	echo ""
+	echo "Options are:"
+	echo "          -h --help"
+	echo "          -c --compress, only used with -s"
+	echo "          -d --delete"
+	echo "          -l --list"
+	echo "          -r --restore"
+	echo "          -s --store"
+	echo "          -v --version"
+	echo ""
+	echo "Always specify options as separate words"
+	echo "  e.g. -c -r instead of -cr. Its required!"
+	echo "Don't use blanks or special characetrs in rom_name."
+	echo "Compress will take longer but image will be smaller."
+	echo "<rom_name> is optional with -r and -d . Choose from a list."
+	echo ""
+}
+
+chooseROM()
+{
+	listr=`_LS_ "${myhome}"`
+	j=1
+	for i in $listr
+	do
+		echo "${j}. ${i}"
+		j=$((j+1))
+	done
+	count=$((j-1))
+	echo -n "Choose a ROM (type in the number and press enter)..."
+	read response
+	if [ $response -gt $count -o $response -lt 1 ]
+	then
+		echo ""
+		echo "Out of range input. You chose $response."
+		echo "Choose a number in range next time...;) BYE."
+		echo ""
+		do_exit 41
+	fi
+	j=1
+	for i in $listr
+	do
+		if [ $j -eq $response ]
+		then
+			romname=$i
+			break;
+		fi
+		j=$((j+1))
+	done
+}
+
+# args processing
+if [ $# -lt 1 ]
+then
+	print_usage
+	exit 1
+fi
+compress=0
+while [ -n "$1" ]
+do
+	case "$1" in
+	-h|--help)
+		print_usage
+		exit 0
+		;;
+	-c|--compress)
+		compress=1
+		shift
+		;;
+	-d|--delete)
+		cmd="delete"
+		shift
+		romname="$1"
+		if [ -n "$romname" ]
+		then
+			shift
+		fi
+		;;
+	-l|--list)
+		cmd="list"
+		shift
+		romname="$1"
+		if [ -n "$romname" ]
+		then
+			shift
+		fi
+		;;
+	-r|--restore)
+		cmd="restore"
+		shift
+		romname="$1"
+		if [ -n "$romname" ]
+		then
+			shift
+		fi
+		;;
+	-s|--store)
+		cmd="store"
+		shift
+		romname="$1"
+		if [ -z "$romname" ]
+		then
+			print_usage
+			exit 1
+		fi
+		shift
+		;;
+	-v|--version)
+		echo ""
+		echo "$0 Version $VER"
+		echo ""
+		exit 0
+		;;
+	*)
+		print_usage
+		exit 1
+	esac
+done
+
+# make sure /system/sd and /sdcard are mounted
+for i in ${SDCARD} ${EXTPART}
+do
+	mounted=`_GREP_ $i /proc/mounts | _AWK_ '{print $2}'`
+	if [ "$mounted" != "$i" ]
+	then
+		# not mounted, mount it
+		_MOUNT_ $i
+		if [ $? -ne 0 ]
+		then
+			echo "Unable to mount $i ..."
+			echo ""
+			do_exit 5
+		fi
+	fi
+done
+myhome="${SDCARD}/${MYFOLDER}"
+rompath="${myhome}/${romname}"
+nandfolder="${rompath}/nandroid"
+
+if [ ! -d "${myhome}" ]
+		then
+			mkdir -p "${myhome}"
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Unable to create dir $myhome..."
+				echo ""
+				do_exit 20
+			fi
+		fi
+
+
+
+# what are we doing?
+case "$cmd" in
+	delete)
+		if [ -z "${romname}" ]
+		then
+			chooseROM
+		fi
+		rompath="${myhome}/${romname}"
+		echo ""
+		echo -n "Deleting ${romname}, proceed? (y/n) "
+		read response
+		if [ "$response" == "y" ]
+		then
+			_RM_ -rf "${rompath}"
+		else
+			echo ""
+			echo "Not deleting ${romname}..."
+			echo ""
+			do_exit 0
+		fi
+		;;
+	list)
+		_LS_ "${rompath}"
+		do_exit 0
+		;;
+	restore)
+		if [ ! -x /sbin/nandroid-mobile.sh ]
+		then
+			echo ""
+			echo "Script /sbin/nandroid-mobile.sh not found"
+			echo "Make sure you are running CM recovery 1.4."
+			echo ""
+			do_exit 31
+		fi
+		if [ -z "${romname}" ]
+		then
+			chooseROM
+		fi
+		rompath="${myhome}/${romname}"
+		nandfolder="${rompath}/nandroid"
+		echo ""
+		echo -n "Restoring ROM ${romname}, proceed? (y/n) "
+		read response
+		if [ "$response" != "y" ]
+		then
+			echo ""
+			echo "Not restoring ${romname}..."
+			echo ""
+			do_exit 0
+		fi
+		if [ ! -d "${rompath}" ]
+		then
+			echo ""
+			echo "ROM ${romname} not found at ${myhome}..."
+			echo ""
+			do_exit 30
+		fi
+		compressed=0
+		if [ -e "${rompath}/ext-backup.tar.gz" ]
+		then
+			compressed=1
+		else
+			if [ ! -e "${rompath}/ext-backup.tar" ]
+			then
+				echo ""
+				echo "App partition backup not found for ROM ${romname}."
+				echo ""
+				do_exit 29
+			fi
+		fi
+
+		# proceed with the restoration process
+		echo "Cleaning up /system/sd ..."
+		_RM_ -rf ${EXTPART}/app* ${EXTPART}/dalv* > /dev/null 2>&1
+		if [ $compressed -eq 1 ]
+		then
+			echo "Restoring compressed app data in ${EXTPART} ..."
+			cd ${EXTPART}
+			gzip -c -d "${rompath}/ext-backup.tar.gz" | _TAR_ xpf -
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during restoration of app data..."
+				echo "tar/gzip operation failed."
+				echo "Do you have enough space on the /sdcard?"
+				echo ""
+				do_exit 28
+			fi
+			cd /
+		else
+			echo "Restoring $romname app data in ${EXTPART} ..."
+			cd ${EXTPART}
+			_TAR_ xpf "${rompath}/ext-backup.tar"
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during restoration of app data..."
+				echo "tar operation failed."
+				echo "Do you have enough space on the /sdcard?"
+				echo ""
+				do_exit 27
+			fi
+			cd /
+		fi
+
+		# do the nandroid restore
+		echo "Restoring nandroid backup..."
+		_UMOUNT_ ${SDCARD}
+		${NANDSH} --defaultinput -r -p "${nandfolder}" -s "${romname}" > "${EXTPART}/${NANDLOG}" 2>&1
+		if [ $? -ne 0 ]
+		then
+			echo ""
+			echo "Error occurred during nandroid restore..."
+			echo "Have a look at \"${EXTPART}/${NANDLOG}\" to find the cause."
+			echo ""
+			do_exit 26
+		fi
+		_RM_ "${EXTPART}/${NANDLOG}"
+		echo "Done restoring the ROM $romname."
+		echo ""
+		do_exit 0
+		;;
+	store)
+		if [ ! -x /sbin/nandroid-mobile.sh ]
+		then
+			echo ""
+			echo "Script /sbin/nandroid-mobile.sh not found"
+			echo "Are you sure you have CM recovery 1.4?"
+			echo ""
+			do_exit 31
+		fi
+		echo ""
+		echo -n "Storing ROM ${romname}, proceed? (y/n) "
+		read response
+		if [ "$response" != "y" ]
+		then
+			echo ""
+			echo "Not storing ${romname}..."
+			echo ""
+			do_exit 0
+		fi
+		if [ ! -d "${rompath}" ]
+		then
+			mkdir -p "${nandfolder}"
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Unable to create dir $rompath..."
+				echo ""
+				do_exit 14
+			fi
+		fi
+
+		if [ $compress -eq 1 ]
+		then
+			# store the apps partition data
+			echo "Storing compressed app data..."
+			cd ${EXTPART}
+			_TAR_ cpf - `_LS_ -d app* dalv* 2>/dev/null` | gzip -1 > "${rompath}/ext-backup.tar.gz"
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during storing of app data..."
+				echo "tar/gzip operation failed."
+				echo "Do you have enough space on the /sdcard?"
+				echo ""
+				do_exit 15
+			fi
+			cd /
+
+			# do a nandroid backup
+			echo "Storing compressed nandroid backup..."
+			_UMOUNT_ ${SDCARD}
+			${NANDSH} -c -b -p "${nandfolder}" -s "${romname}" > "${EXTPART}/${NANDLOG}" 2>&1
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during nandroid backup..."
+				echo "Have a look at \"${EXTPART}/${NANDLOG}\" to find the cause."
+				echo ""
+				do_exit 17
+			fi
+		else
+			# store the apps partition data
+			echo "Storing app data..."
+			cd ${EXTPART}
+			_TAR_ cpf "${rompath}/ext-backup.tar" `_LS_ -d app* dalv* 2>/dev/null`
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during storing of app data..."
+				echo "tar operation failed."
+				echo "Do you have enough space on the /sdcard?"
+				echo ""
+				do_exit 16
+			fi
+			cd /
+
+			# do a nandroid backup
+			echo "Storing nandroid backup..."
+
+			# I need to umount sdcard because nandroid fails if its already mounted
+			# Talk of robustness...:)
+			_UMOUNT_ ${SDCARD}
+			${NANDSH} -b -p "${nandfolder}" -s "${romname}" > "${EXTPART}/${NANDLOG}" 2>&1
+			if [ $? -ne 0 ]
+			then
+				echo ""
+				echo "Error occurred during nandroid backup..."
+				echo "Have a look at \"${EXTPART}/${NANDLOG}\" to find the cause."
+				echo ""
+				do_exit 18
+			fi
+		fi
+		_RM_ "${EXTPART}/${NANDLOG}"
+		echo "Done bookmarking the ROM $romname."
+		echo ""
+		do_exit 0
+		;;
+	*)
+		echo ""
+		echo "Unknown command \"$cmd\"..."
+		print_usage
+		do_exit 6
+		;;
+esac
