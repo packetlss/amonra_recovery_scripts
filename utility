@@ -1,0 +1,206 @@
+#!/sbin/sh
+
+um
+if [ $? != "0" ]; then
+	echo "Unable to unmount!"
+	exit 1
+fi
+
+clear
+echo "More Utilities by BKMO"
+echo ""
+echo "[1] Convert ext3 > ext4 no data loss"
+echo "[2] Fix Permissions 2.03 experimental"
+echo "[3] Backup APPS on ext to FAT32"
+echo "[4] Restore APPS from FAT32 to ext"
+echo "[5] Partition SD 3 partitions (can set sizes)"
+echo "[6] Fix auto-rotate problems"
+echo "[7] Run BART 1.0.1 Backup"
+echo "[8] Run BART 1.0.1 Restore"
+echo "[9] Reset/delete Battery Stats"
+echo "[q] Quit to Console Prompt"
+echo "[b] Boot me out of here! (reboot)"
+echo "[r] Return to Recovery Menu"
+echo " "
+echo -n "Enter Number> "
+read text
+
+if [ $text = "q" ]; then
+	echo "quitting..."
+	clear
+fi
+
+if [ $text = "r" ]; then
+	echo "Returning to Recovery Menu..."
+	recovery
+fi
+
+if [ $text = "b" ]; then
+	echo "Rebooting..."
+	reboot
+fi
+
+if [ $text = "1" ]; then
+	echo "Converting to EXT4"
+	if [ -e /dev/block/mmcblk0p2 ]; then
+		umount /system/sd > /dev/null 2>&1;
+    		set -e;
+		tune2fs -O extents,uninit_bg,dir_index /dev/block/mmcblk0p2;
+		e2fsck -fpDC0 /dev/block/mmcblk0p2;	
+	fi;
+	echo "Partition converted to EXT4"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "2" ]; then
+clear
+	fix_permissions
+	echo ""
+	echo "Fix Permissions completed"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+
+if [ $text = "3" ]; then
+	echo "Backing up EXT Apps to SDcard"
+	if [ -e /dev/block/mmcblk0p2 ]; then
+		mount /system/sd > /dev/null 2>&1
+	fi
+
+	if [ -e /dev/block/mmcblk0p1 ]; then
+		mount /sdcard > /dev/null 2>&1
+	fi
+
+	if [ -e /sdcard/appbackup ]; then
+		rm /sdcard/appbackup/* -f
+		cp /system/sd/app/* /sdcard/appbackup
+	else
+		mkdir /sdcard/appbackup
+		cp /system/sd/app/* /sdcard/appbackup
+	fi
+  	echo "Apps backed up to SDcard"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "4" ]; then
+
+	echo "Restoring Apps from SDcard to EXT "
+	if [ -e /dev/block/mmcblk0p2 ]; then
+		mount /system/sd > /dev/null 2>&1
+	fi
+
+	if [ -e /dev/block/mmcblk0p1 ]; then
+		mount /sdcard > /dev/null 2>&1
+	fi
+if [ $text = "Q" ]; then
+	echo "quitting..."
+	clear
+fi
+	if [ -e /sdcard/appbackup ]; then
+		if [ -e /system/sd/app ]; then
+			rm /system/sd/app/* -f
+			cp /sdcard/appbackup/* /system/sd/app/
+		else
+			mkdir /system/sd/app
+			cp /sdcard/appbackup/* /system/sd/app/
+		echo "Apps restored from SDcard"
+		fi
+	else
+		echo "NO BACKUP FOUND"
+	fi
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "5" ]; then
+clear
+	echo "THIS WILL ERASE ALL DATA ON SDCARD!!!!"
+	echo -n "Continue? (y/n) "	
+	read cont
+	if [ $cont = "n" ]; then
+	exit 0;
+	fi		
+	echo " "
+	echo "Enter a number ex. 32"
+	echo -n "Swap size in MB? "
+	read swap
+	echo "Enter a number ex. 500"
+	echo -n "ext2 size in MB? "
+	read ext
+	umount /dev/block/mmcblk0p1 > /dev/null 2>&1;
+	umount /dev/block/mmcblk0p2 > /dev/null 2>&1;
+	umount /dev/block/mmcblk0p3 > /dev/null 2>&1;
+	SDSIZEMB=`parted /dev/block/mmcblk0 unit MB print | grep mmcblk0 | cut -d" " -f3`
+	SDSIZE=${SDSIZEMB%MB}
+	EXTEND=$(($SDSIZE - $swap))
+	FATEND=$(($EXTEND - $ext))
+	echo " "
+	echo "CLEARING SDCARD..."
+	parted -s /dev/block/mmcblk0 mklabel msdos;
+	echo "CREATING $FATEND MB FAT32 PARTITION..."	
+	parted -s /dev/block/mmcblk0 mkpartfs primary fat32 0 "$FATEND";
+	echo "CREATING $ext MB ext2 PARTITION..."
+	parted -s /dev/block/mmcblk0 mkpartfs primary ext2 "$FATEND" "$EXTEND";
+	echo "CREATING $swap MB LINUX-SWAP PARTITION..."
+	parted -s /dev/block/mmcblk0 mkpartfs primary linux-swap "$EXTEND" "$SDSIZE";
+	echo "DONE!"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "6" ]; then
+	clear	
+	echo "Fixing auto-rotate issue"	
+	wipe rotate
+	echo ""
+	echo "Finished Fixing"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "7" ]; then
+clear
+echo "Run BART Backup with default settings"	
+	echo ""	
+	echo -n "Enter a name for the backup:  "
+	read name
+	bart --verbose --norecovery -s $name
+	echo ""	
+	echo "BART Backup $name saved to SDCARD"
+	echo ""
+        read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "8" ]; then
+clear
+echo "Run BART Restore"	
+	bart --verbose --norecovery -r
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+
+if [ $text = "9" ]; then
+clear
+echo "Reset-delete Battery Stats"	
+	echo ""	
+	mount /data	
+	rm /data/system/batterystats.bin
+	umount /data	
+	echo ""
+	echo "Battery stats deleted/reset"
+	echo ""
+	read -s -n 1 -p "Press any key to continue . . ."
+	utility
+fi
+

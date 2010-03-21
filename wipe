@@ -1,0 +1,37 @@
+#!/sbin/sh
+
+um
+if [ $? != "0" ]; then
+	echo "Unable to unmount!"
+	exit 1
+fi
+
+case $1 in
+    battery)
+	mount /data > /dev/null 2>&1
+	rm /data/system/batterystats.bin
+        ;;
+    dalvik)
+	mount /cache > /dev/null 2>&1
+	rm -rf /cache/dalvik-cache/*
+        ;;
+    ext)
+	if [ -e /dev/block/mmcblk0p2 ]; then
+	    mount /dev/block/mmcblk0p2 /sd-ext
+	    rm -rf /sd-ext/*
+	else
+	    echo "No ext partition found!"
+	    exit 1
+	fi
+        ;;
+    rotate)
+	mount /data > /dev/null 2>&1
+	rm -r /data/misc/akmd*
+	rm -r /data/misc/rild*
+        ;;
+    --)
+        ;;
+esac
+
+exit 0
+

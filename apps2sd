@@ -1,0 +1,32 @@
+#!/sbin/sh
+#
+# moves apps and dalvik-cache to sdcard
+# shade@chemlab.org
+#
+
+um
+if [ $? != "0" ]; then
+	echo "Unable to unmount!"
+	exit 1
+fi
+
+if [ -e /dev/block/mmcblk0p2 ];
+then
+	mount /system/sd > /dev/null 2>&1;
+	mount /data > /dev/null 2>&1;
+
+	for i in app app-private dalvik-cache;
+	do
+		if [ ! -d /system/sd/$i ]; then mkdir /system/sd/$i; fi
+		mv -f /data/$i/* /system/sd/$i/ > /dev/null 2>&1
+		busybox chown 1000:1000 /system/sd/$i
+		busybox chmod 771 /system/sd/$i
+	done;
+
+else
+	echo "No ext partition found!";
+	exit 1;
+fi;
+
+exit 0;
+	
