@@ -2,7 +2,7 @@
 VER="1.1"
 MYFOLDER="switchROM"
 SDCARD="/sdcard"
-EXTPART="/system/sd"
+EXTPART="/sd-ext"
 NANDSH="nandroid-mobile.sh"
 NANDLOG="nandroid.log"
 alias _GREP_="busybox grep"
@@ -148,7 +148,7 @@ do
 	esac
 done
 
-# make sure /system/sd and /sdcard are mounted
+# make sure /sd-ext and /sdcard are mounted
 for i in ${SDCARD} ${EXTPART}
 do
 	mounted=`_GREP_ $i /proc/mounts | _AWK_ '{print $2}'`
@@ -254,7 +254,7 @@ case "$cmd" in
 		fi
 
 		# proceed with the restoration process
-		echo "Cleaning up /system/sd ..."
+		echo "Cleaning up /sd-ext ..."
 		_RM_ -rf ${EXTPART}/app* ${EXTPART}/dalv* > /dev/null 2>&1
 		if [ $compressed -eq 1 ]
 		then

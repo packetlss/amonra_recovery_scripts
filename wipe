@@ -12,12 +12,22 @@ case $1 in
 	rm /data/system/batterystats.bin
         ;;
     dalvik)
+	mount /data > /dev/null 2>&1
+	rm -rf /data/dalv*
+
 	mount /cache > /dev/null 2>&1
-	rm -rf /cache/dalvik-cache/*
+	rm -rf /cache/dalv*
+        
+	if [ -e /dev/block/mmcblk0p2 ]; then
+	    mount /sd-ext > /dev/null 2>&1
+	    rm -rf /sd-ext/dalv*
+	else
+	    echo "No ext partition found!"
+	fi
         ;;
     ext)
 	if [ -e /dev/block/mmcblk0p2 ]; then
-	    mount /dev/block/mmcblk0p2 /sd-ext
+	    mount /sd-ext > /dev/null 2>&1
 	    rm -rf /sd-ext/*
 	else
 	    echo "No ext partition found!"

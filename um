@@ -2,7 +2,7 @@
 
 echo "" > /sys/devices/platform/usb_mass_storage/lun0/file
 
-LIST=`mount | grep "^/" | grep "type yaffs*\|vfat\|ext*" | grep "system*\|data\|sdcard*" | cut -d\  -f 3 | sort -rn`
+LIST=`mount | grep "^/" | grep "type yaffs*\|vfat\|ext*" | grep "system*\|data*\|sd-ext*\|sdcard*" | cut -d\  -f 3 | sort -rn`
 
 if [ "$LIST" != "" ]; then
 	for i in $LIST

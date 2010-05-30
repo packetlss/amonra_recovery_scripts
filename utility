@@ -10,13 +10,13 @@ clear
 echo "More Utilities by BKMO"
 echo ""
 echo "[1] Convert ext3 > ext4 no data loss"
-echo "[2] Fix Permissions 2.03 experimental"
+echo "[2] Fix Permissions 2.03"
 echo "[3] Backup APPS on ext to FAT32"
 echo "[4] Restore APPS from FAT32 to ext"
 echo "[5] Partition SD 3 partitions (can set sizes)"
 echo "[6] Fix auto-rotate problems"
-echo "[7] Run BART 1.0.1 Backup"
-echo "[8] Run BART 1.0.1 Restore"
+echo "[7] Run BART 1.3.1 Backup"
+echo "[8] Run BART 1.3.1 Restore"
 echo "[9] Reset/delete Battery Stats"
 echo "[q] Quit to Console Prompt"
 echo "[b] Boot me out of here! (reboot)"
@@ -43,7 +43,7 @@ fi
 if [ $text = "1" ]; then
 	echo "Converting to EXT4"
 	if [ -e /dev/block/mmcblk0p2 ]; then
-		umount /system/sd > /dev/null 2>&1;
+		umount /sd-ext > /dev/null 2>&1;
     		set -e;
 		tune2fs -O extents,uninit_bg,dir_index /dev/block/mmcblk0p2;
 		e2fsck -fpDC0 /dev/block/mmcblk0p2;	
@@ -68,7 +68,7 @@ fi
 if [ $text = "3" ]; then
 	echo "Backing up EXT Apps to SDcard"
 	if [ -e /dev/block/mmcblk0p2 ]; then
-		mount /system/sd > /dev/null 2>&1
+		mount /sd-ext > /dev/null 2>&1
 	fi
 
 	if [ -e /dev/block/mmcblk0p1 ]; then
@@ -77,10 +77,10 @@ if [ $text = "3" ]; then
 
 	if [ -e /sdcard/appbackup ]; then
 		rm /sdcard/appbackup/* -f
-		cp /system/sd/app/* /sdcard/appbackup
+		cp /sd-ext/app/* /sdcard/appbackup
 	else
 		mkdir /sdcard/appbackup
-		cp /system/sd/app/* /sdcard/appbackup
+		cp /sd-ext/app/* /sdcard/appbackup
 	fi
   	echo "Apps backed up to SDcard"
 	echo ""
@@ -92,7 +92,7 @@ if [ $text = "4" ]; then
 
 	echo "Restoring Apps from SDcard to EXT "
 	if [ -e /dev/block/mmcblk0p2 ]; then
-		mount /system/sd > /dev/null 2>&1
+		mount /sd-ext > /dev/null 2>&1
 	fi
 
 	if [ -e /dev/block/mmcblk0p1 ]; then
@@ -103,12 +103,12 @@ if [ $text = "Q" ]; then
 	clear
 fi
 	if [ -e /sdcard/appbackup ]; then
-		if [ -e /system/sd/app ]; then
-			rm /system/sd/app/* -f
-			cp /sdcard/appbackup/* /system/sd/app/
+		if [ -e /sd-ext/app ]; then
+			rm /sd-ext/app/* -f
+			cp /sdcard/appbackup/* /sd-ext/app/
 		else
-			mkdir /system/sd/app
-			cp /sdcard/appbackup/* /system/sd/app/
+			mkdir /sd-ext/app
+			cp /sdcard/appbackup/* /sd-ext/app/
 		echo "Apps restored from SDcard"
 		fi
 	else
